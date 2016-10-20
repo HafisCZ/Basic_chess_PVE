@@ -3,6 +3,7 @@
 #include <ctime>
 #include <vector>
 #include <cstdlib>
+#include <iterator>
 #include <windows.h>
 
 // (c) 2016 HIRAISHIN SOFTWARE
@@ -46,13 +47,14 @@ bool g_moveTo(int data[][6], int id, int x2, int y2, int player);
 bool g_poss(int data[][6], int id, int x2, int y2, bool ignore_owner);
 int g_at(int data[][6], int x, int y);
 int g_arePresent(int data[][6], int player);
-vector <int> g_areDangers(int data[][6], int pl, int x, int y, bool ignore_owner);
 vector <int> g_areTargets(int data[][6], int pl, int index);
 vector <int> g_areDangerous(int data[][6], int pl, int exclude);
+vector<int> g_prefill(int data[][6], int step[R_PCHAR / 2][4], int player);
+vector <int> g_areDangers(int data[][6], int pl, int x, int y, bool ignore_owner);
 
 int main()
 {
-    srand(time(0));
+    srand((unsigned int) time(NULL));
     g_setup(0);
     do {
         r_render(false, game_data);
@@ -81,19 +83,24 @@ int victory(void) {
 
 /// UPDATED:
 
+vector<int> g_prefill(int data[][6], int step[R_PCHAR / 2][4], int player) {
+    vector<int> pref;
+    for (int i = (player == 0 ? 0 : R_PCHAR / 2); i < (player == 0 ? R_PCHAR / 2 : R_PCHAR); i++) {
+        if (data[i][4] == 1 || i == (player == 0 ? R_PCHAR / 2 - 1 : R_PCHAR - 1)) pref.push_back(i);
+        for (int j = 0; j < 4; j++) step[i - (player == 0 ? 0 : R_PCHAR / 2)][j] = (j == 0 ? -2001 : (j == 3 ? i : -1));
+    }
+    random_shuffle(pref.begin(), pref.end());
+    pref.push_back((player == 0 ? R_PCHAR / 2 - 1 : R_PCHAR - 1));
+    return pref;
+}
+
 void g_com(void) {
     cycles = 0;
     vector <int> rand_pieces;
     int step [R_PCHAR / 2][4]; // SCORE, GOTO x, GOTO y
     cout << "Waiting for COM turn ..." << endl;
 
-    rand_pieces.clear();
-    for (int i = 16; i < R_PCHAR; i++) {
-        if(game_data[i][4] == 1 || i == R_PCHAR - 1) rand_pieces.push_back(i);
-        for (int j = 0; j < 4; j++) step[i - R_PCHAR / 2][j] = (j == 0 ? -2001 : (j == 3 ? i : -1));
-    }
-    random_shuffle(rand_pieces.begin(), rand_pieces.end());
-    rand_pieces.push_back(31);
+    rand_pieces = g_prefill(game_data, step, 1);
 
     for (int n = 0; (unsigned int) n < rand_pieces.size(); n++) {
         int i = rand_pieces[n];
@@ -108,7 +115,6 @@ void g_com(void) {
             int it = game_data[i][1] + moves[i_move_iter][0];
             int yt = game_data[i][2] + moves[i_move_iter][1];
             if (it < 0 || it >= R_SIZE || yt < 0 || yt >= R_SIZE) continue;
-            cout <<"i: "<<i_move_iter<< " X: "<<it <<" Y: "<<yt<< endl;
             if (!g_poss(game_data, i, it, yt, false)) continue;
             int turn_score = -2002;
             cout << "> Available move: [" << yt << "," << it << "] ";
