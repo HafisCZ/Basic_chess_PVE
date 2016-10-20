@@ -1,0 +1,17 @@
+# depslib dependency file v1.0
+1476030632 source:c:\users\hafis\desktop\gits\vsb-prg1\chess\main.cpp
+	<iostream>
+	<algorithm>
+	<ctime>
+	<vector>
+	<cstdlib>
+	<windows.h>
+
+1476561126 source:c:\shared\chess\main.cpp
+	<iostream>
+	<algorithm>
+	<ctime>
+	<vector>
+	<cstdlib>
+	<windows.h>
+
