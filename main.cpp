@@ -42,8 +42,7 @@ Figure game_data[R_PCHAR], predict_data[R_PCHAR];
 unsigned char render_sheet [R_SIZE * 2][R_SIZE];
 
 int steps = 0, win = 0, cycles;
-
-int victory(void);
+bool de_mode;
 
 /// FINAL
 void g_ply(void);
@@ -54,6 +53,7 @@ void g_copy(Figure data[], Figure data_copy[]);
 bool g_isPresent(Figure data[], int id);
 bool g_moveTo(Figure data[], int id, int x2, int y2, Players player);
 bool g_poss(Figure data[], int id, int x2, int y2, bool ignore_owner);
+int victory(void);
 int g_getInt(Types type);
 int g_getScore(Types type);
 int g_at(Figure data[], int x, int y);
@@ -62,9 +62,11 @@ char g_getChar(Types type);
 vector <int> g_areTargets(Figure data[], Players player, int index);
 vector <int> g_areDangerous(Figure data[], Players player, int exclude);
 vector <int> g_areDangers(Figure data[], Players player, int x, int y, bool ignore_owner);
+vector<int> g_areDangersForArea(Figure data[], Players player, int x, int y, int sqRange, bool ignore_center);
 
 int main()
 {
+    de_mode = false;
     srand((unsigned int) time(NULL));
     g_setup(PLAYER);
     do {
@@ -89,7 +91,11 @@ int victory(void) {
     if (g_arePresent(game_data, PLAYER) == 1 && g_arePresent(game_data, COMPUTER) == 1) return 3;
     else if (!game_data[31].alive) return 1;
     else if (!game_data[15].alive) return 2;
-    return 0;
+    else {
+        if (g_areDangersForArea(game_data, PLAYER, game_data[31].x, game_data[31].y, 3, false).size() == 9) return 1;
+        else if (g_areDangersForArea(game_data, COMPUTER, game_data[15].x, game_data[15].y, 3, false).size() == 9) return 2;
+        else return 0;
+    }
 }
 
 /// UPDATED:
@@ -111,7 +117,7 @@ void g_com(void) {
         int i = rand_pieces[n];
         if (!game_data[i].alive) continue;
         g_copy(game_data, predict_data);
-        cout << "Vect#" << n << " contains item #" << i << " [" << game_data[i].y << "," << game_data[i].x << "]" << endl; ///DEBUG
+        if (de_mode) cout << "Vect#" << n << " contains item #" << i << " [" << game_data[i].y << "," << game_data[i].x << "]" << endl; ///DEBUG
 
         Types i_type = game_data[i].type;
         int (*moves)[2] = (i_type == PAWN ? moveset0 : (i_type == KNIGHT ? moveset1 : (i_type == BISHOP ? moveset2 : (i_type == ROOK ? moveset3 : (i_type == QUEEN ? moveset4 : moveset5)))));
@@ -122,7 +128,7 @@ void g_com(void) {
             if (it < 0 || it >= R_SIZE || yt < 0 || yt >= R_SIZE) continue;
             if (!g_poss(game_data, i, it, yt, false)) continue;
             int turn_score = -2002;
-            cout << "> Available move: [" << yt << "," << it << "] ";
+            if (de_mode) cout << "> Available move: [" << yt << "," << it << "] ";
 
             int danger_aim = g_at(game_data, it, yt);
             vector<int> danger_stay = g_areDangers(game_data, PLAYER, game_data[i].x, game_data[i].y, false);
@@ -141,15 +147,20 @@ void g_com(void) {
             vector<int> danger_move_mask = g_areDangerous(predict_data, COMPUTER, i);
             vector<int> danger_move_end;
 
-            set_difference(danger_move_begin.begin(), danger_move_begin.end(), danger_move_mask.begin(), danger_move_mask.end(), back_inserter(danger_move_mask));
+            std::sort(danger_move_begin.begin(), danger_move_begin.end());
+            std::sort(danger_move_mask.begin(), danger_move_mask.end());
+            set_difference(danger_move_begin.begin(), danger_move_begin.end(), danger_move_mask.begin(), danger_move_mask.end(), back_inserter(danger_move_end));
 
             /// WIP END
 
-            if (danger_aim != -1) cout << "-WKILL "; ///DEBUG
-            if (danger_move.size() > 0) cout << "-MVDIE "; ///DEBUG
-            if (danger_stay.size() > 0) cout << "-STDIE "; ///DEBUG
-            if (danger_aim_predict.size() > 0 && danger_move.size() == 0) cout << "-PEKIL "; ///DEBUG
-            if (danger_move_end.size() > 0) cout << "-MVDMG"; ///DEBUG
+            if (de_mode) {
+                if (danger_aim != -1) cout << "-WKILL "; ///DEBUG
+                if (danger_move.size() > 0) cout << "-MVDIE "; ///DEBUG
+                if (danger_stay.size() > 0) cout << "-STDIE "; ///DEBUG
+                if (danger_aim_predict.size() > 0 && danger_move.size() == 0) cout << "-PEKIL "; ///DEBUG
+                if (danger_move_end.size() > 0) cout << "-MVDMG"; ///DEBUG
+            }
+
 
             if (danger_aim != -1) turn_score = g_getScore(game_data[danger_aim].type);
             else turn_score = -g_getScore(game_data[i].type) / 100;
@@ -158,22 +169,24 @@ void g_com(void) {
             if (danger_aim_predict.size() > 0 && danger_move.size() == 0) turn_score += g_getScore(predict_data[danger_aim_predict[0]].type) / 10;
             if (danger_move_end.size() > 0) turn_score -= g_getScore(predict_data[danger_move_end[0]].type);
 
-            cout << endl << "  Move gain: " << turn_score; ///DEBUG
+            if (de_mode) cout << endl << "  Move gain: " << turn_score; ///DEBUG
             if (turn_score > step[i - R_PCHAR / 2][0]) {
-                    cout << " / Gain record: " << turn_score;
+                    if (de_mode) cout << " / Gain record: " << turn_score;
                     step[i - R_PCHAR / 2][0] = turn_score;
                     step[i - R_PCHAR / 2][1] = it;
                     step[i - R_PCHAR / 2][2] = yt;
                     step[i - R_PCHAR / 2][3] = i;
             }
-            cout << endl; ///DEBUG
+            if (de_mode) cout << endl; ///DEBUG
         }
     }
 
-    cout << endl << "Movelist:" << endl; ///DEBUG
-    for (int i = 0; i < R_PCHAR / 2; i++) {
-        if (step[i][0] == -2001) continue;
-        cout << "> Move " << (i < 10 ? " " : "") << i << " [" << step[i][2]<< "," << step[i][1] << "] " << step[i][0] << endl; ///DEBUG
+    if (de_mode) {
+        cout << endl << "Movelist:" << endl; ///DEBUG
+        for (int i = 0; i < R_PCHAR / 2; i++) {
+            if (step[i][0] == -2001) continue;
+            cout << "> Move " << (i < 10 ? " " : "") << i << " [" << step[i][2]<< "," << step[i][1] << "] " << step[i][0] << endl; ///DEBUG
+        }
     }
 
     vector<int*> choice;
@@ -183,11 +196,13 @@ void g_com(void) {
     random_shuffle(choice.begin(), choice.end());
     chosen_id = choice[0][3];
 
-    cout << "Move with maximum gain (took " << cycles << " cycles):"<< endl; ///DEBUG
-    cout << choice[0][0] << " with piece " << choice[0][3] << " >> [" << choice[0][2] << "," << choice[0][1] << "]" << endl; ///DEBUG
+    if (de_mode) {
+        cout << "Move with maximum gain (took " << cycles << " cycles):"<< endl; ///DEBUG
+        cout << choice[0][0] << " with piece " << choice[0][3] << " >> [" << choice[0][2] << "," << choice[0][1] << "]" << endl; ///DEBUG
+    }
     if (!g_moveTo(game_data, chosen_id, choice[0][1], choice[0][2], COMPUTER)) game_data[31].alive = false;
 
-    system("pause>nul");
+    if (de_mode) system("pause>nul");
 }
 
 int g_getScore(Types type) {
@@ -324,14 +339,14 @@ void r_render(bool debug, Figure data[]) {
             }
         }
         for (int i = R_SIZE - 1; i >= 0; i--) {
-            cout << i << " >";
+            cout << i + 1 << " >";
             for (int y = 0; y < R_SIZE; y++) {
                 cout << " " << render_sheet[y * 2][i] << render_sheet[y * 2 + 1][i] << " ";
             }
             cout << endl << endl;
         }
         cout << "   ";
-        for (int i = 0; i < R_SIZE; i++) cout << "  " << i << " ";
+        for (int i = 0; i < R_SIZE; i++) cout << "  " << (char)('a' + i) << " ";
         cout << endl << endl;
     } else {
         for (unsigned int i = 0; i < (sizeof(R_CHARS)/sizeof(*R_CHARS)); i++) {
@@ -394,6 +409,19 @@ vector <int> g_areTargets(Figure data[], Players player, int index) {
     return targets;
 }
 
+vector<int> g_areDangersForArea(Figure data[], Players player, int x, int y, int sqRange, bool ignore_center) {
+    vector<int> can, cans;
+    int ix, iy;
+    for (int i = 0; i < sqRange * sqRange - (ignore_center ? 1 : 0); i++) {
+        ix = x - sqRange / 2 + i / sqRange;
+        iy = y - sqRange / 2 + i % sqRange;
+        can.clear();
+        can = g_areDangers(data, player, ix, iy, false);
+        if (can.size() > 0) cans.push_back(can.at(0));
+    }
+    return cans;
+}
+
 void g_setup(Players player) {
     int side = (player == PLAYER ? 0 : 1);
     for (int i = 0; i < 8; i++) {
@@ -447,9 +475,9 @@ void g_setup(Players player) {
 }
 
 void g_ply(void) {
-    int x, y, x2, y2;
+    char x, y, x2, y2;
     do {
         cout << "Your turn [ROW, COL]: ";
         cin >> y >> x >> y2 >> x2;
-    } while (!g_moveTo(game_data, g_at(game_data, x, y), x2, y2, PLAYER));
+    } while (!g_moveTo(game_data, g_at(game_data, x - 'a', y - '1'), x2 - 'a', y2 - '1', PLAYER));
 }
